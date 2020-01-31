@@ -226,7 +226,7 @@ local ExternalAttachmentAssetProperties = {
   url: { type: "string", format: "uri", },
 };
 
-local PublicationAttachmentProperties = {
+local PublicationAttachmentAssetProperties = {
   command_paper_number: { type: "string", },
   hoc_paper_number: { type: "string", },
   isbn: { type: "string", },
@@ -310,7 +310,7 @@ local PublicationAttachmentProperties = {
           "content_type",
           "url",
         ],
-        properties: FileAttachmentAssetProperties + PublicationAttachmentProperties,
+        properties: FileAttachmentAssetProperties + PublicationAttachmentAssetProperties,
       },
       {
         type: "object",
@@ -319,7 +319,7 @@ local PublicationAttachmentProperties = {
           "attachment_type",
           "url",
         ],
-        properties: HtmlAttachmentAssetProperties + PublicationAttachmentProperties,
+        properties: HtmlAttachmentAssetProperties + PublicationAttachmentAssetProperties,
       },
       {
         type: "object",
@@ -328,7 +328,7 @@ local PublicationAttachmentProperties = {
           "attachment_type",
           "url",
         ],
-        properties: ExternalAttachmentAssetProperties + PublicationAttachmentProperties,
+        properties: ExternalAttachmentAssetProperties + PublicationAttachmentAssetProperties,
       }
     ],
   },
