@@ -195,6 +195,47 @@ I propose we do this:
 The final schemas will be:
 
 ```
+local FileAttachmentAssetProperties = {
+  accessible: { type: "boolean", },
+  alternative_format_contact_email: { type: "string", },
+  attachment_type: { type: "string", enum: ["file"], },
+  content_type: { type: "string", },
+  file_size: { type: "integer", },
+  filename: { type: "string", },
+  id: { type: "string" },
+  locale: { "$ref": "#/definitions/locale", },
+  number_of_pages: { type: "integer", },
+  preview_url: { type: "string", format: "uri", },
+  title: { type: "string", },
+  url: { type: "string", format: "uri", },
+};
+
+local HtmlAttachmentAssetProperties = {
+  attachment_type: { type: "string", enum: ["html"], },
+  id: { type: "string" },
+  locale: { "$ref": "#/definitions/locale", },
+  title: { type: "string", },
+  url: { type: "string", format: "uri", },
+};
+
+local ExternalAttachmentAssetProperties = {
+  attachment_type: { type: "string", enum: ["external"], },
+  id: { type: "string" },
+  locale: { "$ref": "#/definitions/locale", },
+  title: { type: "string", },
+  url: { type: "string", format: "uri", },
+};
+
+local PublicationAttachmentProperties = {
+  command_paper_number: { type: "string", },
+  hoc_paper_number: { type: "string", },
+  isbn: { type: "string", },
+  parliamentary_session: { type: "string", },
+  unique_reference: { type: "string", },
+  unnumbered_command_paper: { type: "boolean", },
+  unnumbered_hoc_paper: { type: "boolean", },
+};
+
 {
   image_asset: {
     type: "object",
@@ -220,20 +261,7 @@ The final schemas will be:
       "content_type",
       "url",
     ],
-    properties: {
-      accessible: { type: "boolean", },
-      alternative_format_contact_email: { type: "string", },
-      attachment_type: { type: "string", enum: ["file"], },
-      content_type: { type: "string", },
-      file_size: { type: "integer", },
-      filename: { type: "string", },
-      id: { type: "string" },
-      locale: { "$ref": "#/definitions/locale", },
-      number_of_pages: { type: "integer", },
-      preview_url: { type: "string", format: "uri", },
-      title: { type: "string", },
-      url: { type: "string", format: "uri", },
-    },
+    properties: FileAttachmentAssetProperties,
   },
 
   html_attachment_asset: {
@@ -243,13 +271,7 @@ The final schemas will be:
       "attachment_type",
       "url",
     ],
-    properties: {
-      attachment_type: { type: "string", enum: ["html"], },
-      id: { type: "string" },
-      locale: { "$ref": "#/definitions/locale", },
-      title: { type: "string", },
-      url: { type: "string", format: "uri", },
-    },
+    properties: HtmlAttachmentAssetProperties,
   },
 
   external_attachment_asset: {
@@ -259,51 +281,55 @@ The final schemas will be:
       "attachment_type",
       "url",
     ],
-    properties: {
-      attachment_type: { type: "string", enum: ["external"], },
-      id: { type: "string" },
-      locale: { "$ref": "#/definitions/locale", },
-      title: { type: "string", },
-      url: { type: "string", format: "uri", },
-    },
+    properties: ExternalAttachmentAssetProperties,
   },
 
   specialist_publisher_attachment_asset: {
-    allOf: [
-      { "$ref": "#/definitions/file_attachment_asset" },
-      {
-        required: [
-          "content_id",
-        ],
-        properties: {
-          content_id: { "$ref": "#/definitions/guid", },
-          created_at: { format: "date-time", },
-          updated_at: { format: "date-time", },
-        },
-      },
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "attachment_type",
+      "content_id",
+      "content_type",
+      "url",
     ],
+    properties: FileAttachmentAssetProperties + {
+      content_id: { "$ref": "#/definitions/guid", },
+      created_at: { format: "date-time", },
+      updated_at: { format: "date-time", },
+    },
   },
 
   publication_attachment_asset: {
-    allOf: [
+    oneOf: [
       {
-        oneOf: [
-          { "$ref": "#/definitions/file_attachment_asset" },
-          { "$ref": "#/definitions/html_attachment_asset" },
-          { "$ref": "#/definitions/external_attachment_asset" },
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "attachment_type",
+          "content_type",
+          "url",
         ],
+        properties: FileAttachmentAssetProperties + PublicationAttachmentProperties,
       },
       {
-        properties: {
-          command_paper_number: { type: "string", },
-          hoc_paper_number: { type: "string", },
-          isbn: { type: "string", },
-          parliamentary_session: { type: "string", },
-          unique_reference: { type: "string", },
-          unnumbered_command_paper: { type: "boolean", },
-          unnumbered_hoc_paper: { type: "boolean", },
-        },
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "attachment_type",
+          "url",
+        ],
+        properties: HtmlAttachmentAssetProperties + PublicationAttachmentProperties,
       },
+      {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "attachment_type",
+          "url",
+        ],
+        properties: ExternalAttachmentAssetProperties + PublicationAttachmentProperties,
+      }
     ],
   },
 }
