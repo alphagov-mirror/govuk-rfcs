@@ -271,6 +271,9 @@ The app will also serve these internal endpoints:
     - `session_id`: the value of the `GOVUK-Session-ID` header
     - `attributes`: hash of attribute names and values
 
+  This is a partial update.  Attributes *not* named in the hash keep
+  their previous values.
+
 - `POST /api/state`: sets some attribute values that will be persisted
   if the user creates a new account, regardless of whether the user
   returns to GOV.UK.  Accepts these parameters:
