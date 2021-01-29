@@ -221,7 +221,7 @@ if (resp.http.Vary ~ "GOVUK-Session-ID") {
 ```
 
 The `1800` here (30 minutes) is just an example.  We will work out an
-appropriate session duration in with product and security input.
+appropriate session duration with product and security input.
 
 ### Create a new app to manage the auth process
 
