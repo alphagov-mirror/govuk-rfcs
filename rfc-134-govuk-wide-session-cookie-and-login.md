@@ -203,14 +203,11 @@ response depended on the session:
 
 ```vcl
 if (req.http.GOVUK-End-Session == "true") {
-    set req.http.GOVUK-Session = "";
+  add resp.http.Set-Cookie = "govuk_account_session=; secure; httponly; samesite=strict; max-age=0; path=/";
 } else if (req.http.GOVUK-Session-ID) {
   set req.http.GOVUK-Session-Expires = strftime({"%s"}, time.add(now, 1800s));
   set req.http.GOVUK-Session-Signature = digest.hmac_sha256(table.lookup(env, "session_key"), req.http.GOVUK-Session-ID + "." + req.http.GOVUK-Session-Expires));
   set req.http.GOVUK-Session = digest.base64url_nopad(req.http.GOVUK-Session-ID) + "." + digest.base64url_nopad(req.http.GOVUK-Session-Expires) + "." + digest.base64url_nopad(req.http.GOVUK-Session-Signature);
-}
-
-if (req.http.GOVUK-Session) {
   add resp.http.Set-Cookie = "govuk_account_session=" + req.http.GOVUK-Session + "; secure; httponly; samesite=strict; max-age=1800; path=/";
 }
 
