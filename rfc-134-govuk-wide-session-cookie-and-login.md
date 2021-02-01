@@ -293,7 +293,8 @@ The app will also serve these internal endpoints:
 
     - `attributes`: hash of attribute names and values
 
-    Returns an ID which can be passed to `/sign-in`.
+    Returns an ID which can be passed to `/sign-in`.  The record
+    expires after 1 hour.
 
 Here are a few examples of how the Transition Checker will work:
 
