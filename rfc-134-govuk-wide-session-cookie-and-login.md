@@ -243,7 +243,7 @@ This app will serve these public endpoints:
       domain (optional)
     - `redirect_path`: path on GOV.UK to redirect back to after
       authenticating (optional, default: `/`)
-    - `state`: see below (optional)
+    - `state_id`: see below (optional)
 
 - `GET /sign-in/callback`: where the accounts system sends the user
   back to.  Sets the `GOVUK-Session-ID` response header and stores the
@@ -310,7 +310,7 @@ Here are a few examples of how the Transition Checker will work:
    which:
 
    - Calls `/api/state` with the user's answers, generating an ID
-   - Redirects the user to `/sign-in?state=...&redirect_path=...&_ga=...`
+   - Redirects the user to `/sign-in?state_id=...&redirect_path=...&_ga=...`
 
 2. The new app passes the state attributes to the accounts system
 
@@ -327,7 +327,7 @@ welcomes the user, says we've sent them a confirmation email, and
 gives a link back to the service.  We want to persist the attributes
 even if the user does not click that link.
 
-We plan to remove the `state` things when we retire the Transition
+We plan to remove the `state_id` things when we retire the Transition
 Checker experiment.
 
 ### Local development
