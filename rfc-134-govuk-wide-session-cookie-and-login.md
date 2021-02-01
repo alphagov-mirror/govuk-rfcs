@@ -59,12 +59,12 @@ need something on www.gov.uk itself to set the cookie.
 
 ### Non-personalised parts of GOV.UK need to manipulate the session cookie too
 
-It's unlikely that personalisation will roll out to all of GOV.UK in
-one go.  There will be islands of personalised content.  Currently
-there is the Transition Checker.  Maybe next will be some guidance
-pages, or something else.  We want to keep the user's session alive
-while they are browsing the non-personalised parts of GOV.UK,
-otherwise we risk this bad experience:
+It's unlikely that all of GOV.UK will be personalised, so there will
+be islands of personalised content.  Currently there is the Transition
+Checker.  Maybe next will be some guidance pages, or something else.
+We want to keep the user's session alive while they are browsing the
+non-personalised parts of GOV.UK, otherwise we risk this bad
+experience:
 
 1. The user logs in to use some personalised part of GOV.UK.
 
