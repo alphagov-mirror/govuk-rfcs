@@ -298,7 +298,7 @@ Here are a few examples of how the Transition Checker will work:
 
 1. The link sends the user to `/sign-in?redirect_path=...&_ga=...`
 
-2. The user is redirected to `www.account.publishing....`
+2. The user is redirected to the GOV.UK Account service domain
 
 3. The user authenticates (registers or signs in)
 
