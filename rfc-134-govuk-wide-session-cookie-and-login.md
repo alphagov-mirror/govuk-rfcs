@@ -258,9 +258,12 @@ This app will serve these public endpoints:
   the user successfully signed in, and redirects the user back to the
   redirect_path.
 
-- `GET /sign-out`: sets the `GOVUK-End-Session` response header,
-  deletes the OAuth tokens from the app's database, and redirects the
-  user to `/`.
+- `GET /sign-out`: sets the `GOVUK-End-Session` response header and
+  deletes the OAuth tokens from the app's database.  Accepts these
+  parameters:
+
+    - `redirect_path`: path on GOV.UK to redirect back to after
+      signing out (optional, default: `/`)
 
 The public endpoints are just part of redirection flows, they have no
 visible response.
