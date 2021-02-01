@@ -268,7 +268,7 @@ The app will also serve these internal endpoints:
 
     Returns a hash of attribute names and values.
 
-- `POST /api/attributes`: sets some attribute values on the user's
+- `PATCH /api/attributes`: sets some attribute values on the user's
   account.  Accepts these parameters:
 
     - `session_id`: the value of the `GOVUK-Session-ID` header
