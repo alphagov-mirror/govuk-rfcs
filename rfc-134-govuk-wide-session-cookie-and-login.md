@@ -255,6 +255,9 @@ This app will serve these public endpoints:
   deletes the OAuth tokens from the app's database, and redirects the
   user to `/`.
 
+The public endpoints are just part of redirection flows, they have no
+visible response.
+
 The app will also serve these internal endpoints:
 
 - `GET /api/attributes`: looks up and returns some attributes from the
