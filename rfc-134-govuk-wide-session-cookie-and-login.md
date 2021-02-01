@@ -3,7 +3,7 @@
 ## Summary
 
 We propose introducing a new cookie, `govuk_account_session`, which
-will be an optional cookie, required only for users who wish to use
+will be an essential cookie, but only set when a user signs in to use
 personalised parts of GOV.UK (currently just the Transition Checker).
 
 Similarly to how our A/B tests work we will manage this cookie at the
