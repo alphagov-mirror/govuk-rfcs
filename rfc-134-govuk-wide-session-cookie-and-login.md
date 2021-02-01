@@ -93,6 +93,16 @@ The Fastly docs have some [comments on the risks of cookies][fastly-cookies-risk
 
 ## Proposal
 
+### Set a cookie on www.gov.uk
+
+We'll set a new cookie, `govuk_account_session`, on www.gov.uk.  This
+cookie will hold a session ID, generated when the user signs in.
+
+This cookie cannot be set on the `gov.uk` domain, so service domains
+will need to re-authenticate and manage their own sessions.  This RFC
+is just about authentication and attribute use on www.gov.uk itself.
+The cross-government single-sign-on part of this work is out of scope.
+
 ### Manage the cookie entirely in VCL
 
 [Fastly's best practices for cookies][fastly-cookies-practices]
