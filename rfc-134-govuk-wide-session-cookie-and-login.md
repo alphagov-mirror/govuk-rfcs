@@ -260,6 +260,9 @@ This app will serve these public endpoints:
   the user successfully signed in, and redirects the user back to the
   redirect_path.
 
+  The session ID is generated randomly.  If a user signs in multiple
+  times they will receive different session IDs.
+
 - `GET /sign-out`: sets the `GOVUK-End-Session` response header and
   deletes the OAuth tokens from the app's database.  Accepts these
   parameters:
