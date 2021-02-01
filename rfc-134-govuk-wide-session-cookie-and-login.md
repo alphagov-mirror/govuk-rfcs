@@ -161,6 +161,8 @@ session ID in the `GOVUK-Session-ID` header for our apps, if it's not
 ok, unset it.
 
 ```vcl
+unset req.http.GOVUK-Session-ID;
+
 if (req.http.Cookie ~ "govuk_account_session") {
   if (req.http.Cookie:govuk_account_session ~ "^([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?$") {
     set req.http.GOVUK-Session-ID = digest.base64url_nopad_decode(re.group.1);
