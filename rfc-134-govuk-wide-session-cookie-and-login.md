@@ -2,9 +2,9 @@
 
 ## Summary
 
-We propose introducing a new cookie, `govuk_session`, which will be an
-optional cookie, required only for users who wish to use personalised
-parts of GOV.UK (currently just the Transition Checker).
+We propose introducing a new cookie, `govuk_account_session`, which
+will be an optional cookie, required only for users who wish to use
+personalised parts of GOV.UK (currently just the Transition Checker).
 
 Similarly to how our A/B tests work we will manage this cookie at the
 Fastly layer, in Varnish Configuration Language (VCL), and use custom
@@ -151,8 +151,8 @@ session ID in the `GOVUK-Session-ID` header for our apps, if it's not
 ok, unset it.
 
 ```vcl
-if (req.http.Cookie ~ "govuk_session") {
-  if (req.http.Cookie:govuk_session ~ "^([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?$") {
+if (req.http.Cookie ~ "govuk_account_session") {
+  if (req.http.Cookie:govuk_account_session ~ "^([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?$") {
     set req.http.GOVUK-Session-ID = digest.base64url_nopad_decode(re.group.1);
     set req.http.GOVUK-Session-Expires = digest.base64url_nopad_decode(re.group.2);
     set req.http.GOVUK-Session-Signature = digest.base64url_nopad_decode(re.group.3);
@@ -211,7 +211,7 @@ if (req.http.GOVUK-End-Session == "true") {
 }
 
 if (req.http.GOVUK-Session) {
-  add resp.http.Set-Cookie = "govuk_session=" + req.http.GOVUK-Session + "; secure; httponly; samesite=strict; max-age=1800; path=/";
+  add resp.http.Set-Cookie = "govuk_account_session=" + req.http.GOVUK-Session + "; secure; httponly; samesite=strict; max-age=1800; path=/";
 }
 
 if (resp.http.Vary ~ "GOVUK-Session-ID") {
@@ -332,6 +332,6 @@ Checker experiment.
 A Fastly-managed cookie won't work when running GOV.UK apps locally.
 
 To support that use-case, if `Rails.env.development?`, the new app
-will set an unencrypted `govuk_session` cookie, on the domain
+will set an unencrypted `govuk_account_session` cookie, on the domain
 `dev.gov.uk`, which contains the `GOVUK-Session-ID`, in addition to
 sending the response headers.
