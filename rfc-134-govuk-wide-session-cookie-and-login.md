@@ -11,8 +11,8 @@ Fastly layer, in Varnish Configuration Language (VCL), and use custom
 request headers to pass the cookie value to our apps. We will also use
 custom response headers to set a new cookie value.
 
-We will create a new app to handle the login and logout process, and
-to manage the OAuth tokens used to update a user's data.
+We will create a new app to provide the internal account-supporting
+API, and extend frontend to handle the login and logout process.
 
 ## Problem
 
@@ -232,18 +232,12 @@ if (resp.http.Vary ~ "GOVUK-Session-ID") {
 The `1800` here (30 minutes) is just an example.  We will work out an
 appropriate session duration with product and security input.
 
-### Create a new app to manage the auth process
+### Extend frontend to manage the auth process
 
 It's weird to have the login and logout controllers for GOV.UK as a
 whole located under `/transition-check`.
 
-We will create a new app—called account-frontend, which will live on a
-new machine class called personalisation—to serve those controllers
-and to handle OAuth interactions with the GOV.UK Account
-system. Signing in will set the `GOVUK-Session-ID` response header,
-signing out will set the `GOVUK-End-Session` response header.
-
-This app will serve these public endpoints:
+We will instead add the following endpoints to frontend:
 
 - `GET /sign-in`: initiates the OAuth flow with the accounts system
   and sends the user on a consent journey.  Accepts these parameters:
@@ -270,10 +264,16 @@ This app will serve these public endpoints:
     - `redirect_path`: path on GOV.UK to redirect back to after
       signing out (optional, default: `/`)
 
-The public endpoints are just part of redirection flows, they have no
+These endpoints are just part of redirection flows, they have no
 visible response.
 
-The app will also serve these internal endpoints:
+### Create a new app to provide internal APIs
+
+We will create a new app—called account-api, which will live on a new
+machine class called personalisation—to manage sessions and to handle
+OAuth interactions with the GOV.UK Account system.
+
+The app will serve these endpoints:
 
 - `GET /api/attributes`: looks up and returns some attributes from the
   user's account.  Accepts these parameters:
@@ -301,7 +301,10 @@ The app will also serve these internal endpoints:
     Returns an ID which can be passed to `/sign-in`.  The record
     expires after 1 hour.
 
-Here are a few examples of how the Transition Checker will work:
+### How the Transition Checker will work
+
+Here are a few examples of how the Transition Checker will work with
+endpoints moved to frontend and to account-api:
 
 #### Clicking the "Sign in" link in the header
 
