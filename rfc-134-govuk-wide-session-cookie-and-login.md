@@ -2,9 +2,10 @@
 
 ## Summary
 
-We propose introducing a new cookie, `govuk_account_session`, which
-will be an essential cookie, but only set when a user signs in to use
-personalised parts of GOV.UK (currently just the Transition Checker).
+We propose introducing a new cookie, `__Host-govuk_account_session`,
+which will be an essential cookie, but only set when a user signs in
+to use personalised parts of GOV.UK (currently just the Transition
+Checker).
 
 Similarly to how our A/B tests work we will manage this cookie at the
 Fastly layer, in Varnish Configuration Language (VCL), and use custom
@@ -57,7 +58,7 @@ which manipulate the cookie. These controllers will redirect the user
 to the GOV.UK Account system to do the actual authentication, but we
 need something on www.gov.uk itself to set the cookie.
 
-### Non-personalised parts of GOV.UK need to manipulate the session cookie too
+### Non-personalised parts of GOV.UK won't manipulate the session cookie
 
 It's unlikely that all of GOV.UK will be personalised, so there will
 be islands of personalised content.  Currently there is the Transition
@@ -93,120 +94,96 @@ The Fastly docs have some [comments on the risks of cookies][fastly-cookies-risk
 
 ## Proposal
 
-### Set a cookie on www.gov.uk
+### Set a session cookie on www.gov.uk
 
-We'll set a new cookie, `govuk_account_session`, on www.gov.uk.  This
-cookie will hold a session ID, generated when the user signs in.
+We'll set a new cookie, `__Host-govuk_account_session`, on www.gov.uk.
+This cookie will hold a unique session ID, randomly generated (in a
+collision-resistant way) when the user signs in, which is encrypted
+using asymmetric crypto.
+
+This cookie is a secure, [domain-locked][], session cookie:
+
+```
+Set-Cookie: __Host-govuk_account_session=<value>; secure; httponly; samesite=strict; path=/
+```
+
+It can be expired, logging a user out, by re-setting it with
+`max-age=0`.
 
 This cookie cannot be set on the `gov.uk` domain, so service domains
 will need to re-authenticate and manage their own sessions.  This RFC
 is just about authentication and attribute use on www.gov.uk itself.
 The cross-government single-sign-on part of this work is out of scope.
 
-### Manage the cookie entirely in VCL
+[domain-locked]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#Cookie_prefixes
+
+#### Cookie encryption
+
+The cookie value is encrypted with a private key.  This ensures that
+an attacker cannot tamper with the value.  Apps which consume the
+cookie can use the public key to validate it.  This key can be truly
+public, as the session ID itself is not sensitive.
+
+If the cookie value is malformed, for example if an attacker has tried
+re-encrypting it with a different private key, the consuming app
+should log the user out by expiring the cookie.
+
+#### Session duration
+
+We will have an internal API app (more on this later), keeping track
+of the mapping from session ID to user information, such as a user ID
+or OAuth tokens.
+
+This session ID will expire after 1 hour of inactivity, at which point
+the user will need to log in again.  The expiration timeout is reset
+whenever the session is used to access some personalised content.
+
+The average GOV.UK session length is 2.5 hours, but we know that this
+is distorted by a few users who leave pages open for very long times.
+We can revise the session ID timeout if we see evidence that 1 hour is
+too short.
+
+### Use custom HTTP headers to pass the cookie around
 
 [Fastly's best practices for cookies][fastly-cookies-practices]
 suggest parsing cookies into custom headers and using these headers
 for caching purposes, rather than caching based on the entire
-Set-Cookie header (which in our case also contains non-account-related
-things like A/B test bucket assignment, Google Analytics session ID,
-and cookie consent preferences).
+`Set-Cookie` header (which in our case also contains
+non-account-related things like A/B test bucket assignment, Google
+Analytics session ID, and cookie consent preferences).
 
-Rather than have multiple GOV.UK frontend apps worry about receiving
-the cookie and bumping its expiration time, if we manage the cookie
-entirely in VCL—parsing it into a new `GOVUK-Session-ID` header—we
-only need to worry about returning appropriate response headers.
+In addition, we have nginx configuration to strip out `Set-Cookie`
+headers.  By using custom headers we keep that logic in place,
+ensuring we can't make a mistake and start setting a cookie from one
+of our apps inappropriately.
 
-We will need to make three changes to our VCL.
+We will introduce two new headers:
+
+- `GOVUK-Account-Session`: holds the encrypted session ID.  Set by
+  Fastly to pass the cookie to our apps, set by our apps to create a
+  new cookie.
+
+- `GOVUK-Account-End-Session`: set by our apps to expire the cookie.
+
+We will need to make two changes to our VCL.
 
 [fastly-cookies-practices]: https://developer.fastly.com/reference/http-headers/Cookie/#best-practices
 
-#### Preventing tampering with the cookie
-
-We can't rely on client-side cookie timeouts to log users out.  If an
-attacker gets a copy of a user's session cookie, they can include it
-in any requests they send, regardless of whether it has expired.  So
-we need to sign the cookie value and expiration time to prevent
-tampering.
-
-The cookie value will be of the form:
-
-```ruby
-"#{base64(session_id)}.#{base64(expiration_time)}.#{base64(signature)}"
-```
-
-Where the signature is computed with:
-
-```ruby
-hmac_sha256(secret_key, "#{session_id}.#{expiration_time}")
-```
-
-We will need a random string as a signing key, stored in a table:
-
-```vcl
-table env {
-  "session_key": "random string goes here"
-}
-```
-
-This approach is based on [jwt-vcl][], though we don't need a full JWT
-implementation so I have simplified it.
-
-[jwt-vcl]: https://github.com/phamann/jwt-vcl
-
 #### Changes to `vcl_recv`
 
-When receiving a request, validate the cookie: if it's ok, put the
-session ID in the `GOVUK-Session-ID` header for our apps, if it's not
-ok, unset it.
+When receiving a request, extract the cookie value and pass it in the
+header:
 
 ```vcl
-unset req.http.GOVUK-Session-ID;
-
-if (req.http.Cookie ~ "govuk_account_session") {
-  if (req.http.Cookie:govuk_account_session ~ "^([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?\.([a-zA-Z0-9\-_]+)?$") {
-    set req.http.GOVUK-Session-ID = digest.base64url_nopad_decode(re.group.1);
-    set req.http.GOVUK-Session-Expires = digest.base64url_nopad_decode(re.group.2);
-    set req.http.GOVUK-Session-Signature = digest.base64url_nopad_decode(re.group.3);
-    set req.http.GOVUK-Session-Expected-Signature = digest.hmac_sha256(table.lookup(env, "session_key"), req.http.GOVUK-Session-ID + "." + req.http.GOVUK-Session-Expires);
-
-    if(!digest.secure_is_equal(req.http.GOVUK-Session-Signature, req.http.GOVUK-Session-Expected-Signature) || time.is_after(now, std.integer2time(std.atoi(req.http.GOVUK-Session-Expires)))) {
-      set req.http.GOVUK-End-Session = "true";
-      unset req.http.GOVUK-Session-ID;
-    }
-
-    unset req.http.GOVUK-Session-Expires;
-    unset req.http.GOVUK-Session-Signature;
-    unset req.http.GOVUK-Session-Expected-Signature;
-  } else {
-    set req.http.GOVUK-End-Session = "true";
-  }
-}
+set req.http.GOVUK-Account-Session = req.http.Cookie:__Host-govuk_account_session;
 ```
 
-#### Changes to `vcl_fetch`
-
-When fetching a response from the backend, record the new
-`GOVUK-Session-ID` value, if one is returned; and end the session, if
-the user has been logged out:
-
-```vcl
-if (beresp.http.GOVUK-Session-ID) {
-  set req.http.GOVUK-Session-ID = beresp.http.GOVUK-Session-ID;
-}
-
-if (beresp.http.GOVUK-End-Session) {
-  set req.http.GOVUK-End-Session = "true";
-  unset req.http.GOVUK-Session-ID;
-}
-```
+#### Changes to `vcl_deliver`
 
 If the response depends on the user session, it must either:
 
-1. Set a `Vary: GOVUK-Session-ID` header, or
+1. Set a `Vary: GOVUK-Account-Session` header, or
 2. Set headers to prevent caching entirely
-
-#### Changes to `vcl_deliver`
 
 When delivering a response to the user, set a new cookie with a new
 expiration time, and disable shared caches outside of Fastly (both
@@ -214,23 +191,19 @@ Fastly and the user's browser can still cache the page) if the
 response depended on the session:
 
 ```vcl
-if (req.http.GOVUK-End-Session == "true") {
-  add resp.http.Set-Cookie = "govuk_account_session=; secure; httponly; samesite=strict; max-age=0; path=/";
-} else if (req.http.GOVUK-Session-ID) {
-  set req.http.GOVUK-Session-Expires = strftime({"%s"}, time.add(now, 1800s));
-  set req.http.GOVUK-Session-Signature = digest.hmac_sha256(table.lookup(env, "session_key"), req.http.GOVUK-Session-ID + "." + req.http.GOVUK-Session-Expires));
-  set req.http.GOVUK-Session = digest.base64url_nopad(req.http.GOVUK-Session-ID) + "." + digest.base64url_nopad(req.http.GOVUK-Session-Expires) + "." + digest.base64url_nopad(req.http.GOVUK-Session-Signature);
-  add resp.http.Set-Cookie = "govuk_account_session=" + req.http.GOVUK-Session + "; secure; httponly; samesite=strict; max-age=1800; path=/";
+if (resp.http.GOVUK-Account-End-Session) {
+  add resp.http.Set-Cookie = "__Host-govuk_account_session=; secure; httponly; samesite=strict; path=/; max-age=0"
+  unset resp.http.GOVUK-Account-End-Session;
+} else if (resp.http.GOVUK-Account-Session) {
+  add resp.http.Set-Cookie = "__Host-govuk_account_session=" + resp.http.GOVUK-Account-Session + "; secure; httponly; samesite=strict; path=/"
+  unset resp.http.GOVUK-Account-Session;
 }
 
-if (resp.http.Vary ~ "GOVUK-Session-ID") {
-  unset resp.http.Vary:GOVUK-Session-ID;
+if (resp.http.Vary ~ "GOVUK-Account-Session") {
+  unset resp.http.Vary:GOVUK-Account-Session;
   set resp.http.Cache-Control:private = "";
 }
 ```
-
-The `1800` here (30 minutes) is just an example.  We will work out an
-appropriate session duration with product and security input.
 
 ### Extend frontend to manage the auth process
 
@@ -252,16 +225,14 @@ We will instead add the following endpoints to frontend:
   user to.
 
 - `GET /sign-in/callback`: where the accounts system sends the user
-  back to.  Sets the `GOVUK-Session-ID` response header and stores the
-  returned OAuth access and refresh tokens in the app's database, if
-  the user successfully signed in, and redirects the user back to the
+  back to.  Sets the `GOVUK-Account-Session` response header if the
+  user successfully signed in.  Redirects the user back to the
   `redirect_path`.
 
   This calls `POST /api/oauth/callback` to create the session.
 
-- `GET /sign-out`: sets the `GOVUK-End-Session` response header and
-  deletes the OAuth tokens from the app's database.  Accepts these
-  parameters:
+- `GET /sign-out`: sets the `GOVUK-Account-End-Session` response
+  header and deletes the session state.  Accepts these parameters:
 
     - `redirect_path`: path on GOV.UK to redirect back to after
       signing out (optional, default: `/`)
@@ -282,19 +253,22 @@ The app will serve these endpoints:
 - `GET /api/attributes`: looks up and returns some attributes from the
   user's account.  Accepts these parameters:
 
-    - `session_id`: the value of the `GOVUK-Session-ID` header
+    - `session_id`: the decrypted session ID
     - `attributes`: list of attribute names
 
-    Returns a hash of attribute names and values.
+    Returns a hash of attribute names and values, or a 401 if the
+    session has expired.
 
 - `PATCH /api/attributes`: sets some attribute values on the user's
   account.  Accepts these parameters:
 
-    - `session_id`: the value of the `GOVUK-Session-ID` header
+    - `session_id`: the decrypted session ID
     - `attributes`: hash of attribute names and values
 
   This is a partial update.  Attributes *not* named in the hash keep
   their previous values.
+
+  Returns a 401 if the session has expired.
 
 - `GET /api/oauth/sign-in`: returns a URL to redirect the user to, to
   initiate the OAuth login/consent flow.  Accepts these parameters:
@@ -340,7 +314,7 @@ endpoints moved to frontend and to account-api:
 5. A session ID is generated, and used to persist the OAuth access and
    refresh tokens to the app's database
 
-6. The `GOVUK-Session-ID` response header is set
+6. The `GOVUK-Account-Session` response header is set
 
 7. The user is redirected to `redirect_path`
 
@@ -376,5 +350,5 @@ A Fastly-managed cookie won't work when running GOV.UK apps locally.
 
 To support that use-case, if `Rails.env.development?`, the new app
 will set an unencrypted `govuk_account_session` cookie, on the domain
-`dev.gov.uk`, which contains the `GOVUK-Session-ID`, in addition to
-sending the response headers.
+`dev.gov.uk`, which contains the session ID, in addition to sending
+the response headers.
