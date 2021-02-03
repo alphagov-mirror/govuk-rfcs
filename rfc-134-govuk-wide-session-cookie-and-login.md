@@ -248,14 +248,16 @@ We will instead add the following endpoints to frontend:
       authenticating (optional, default: `/`)
     - `state_id`: see below (optional)
 
+  This calls `GET /api/oauth/sign-in` to get the URL to redirect the
+  user to.
+
 - `GET /sign-in/callback`: where the accounts system sends the user
   back to.  Sets the `GOVUK-Session-ID` response header and stores the
   returned OAuth access and refresh tokens in the app's database, if
   the user successfully signed in, and redirects the user back to the
-  redirect_path.
+  `redirect_path`.
 
-  The session ID is generated randomly.  If a user signs in multiple
-  times they will receive different session IDs.
+  This calls `POST /api/oauth/callback` to create the session.
 
 - `GET /sign-out`: sets the `GOVUK-End-Session` response header and
   deletes the OAuth tokens from the app's database.  Accepts these
@@ -263,6 +265,8 @@ We will instead add the following endpoints to frontend:
 
     - `redirect_path`: path on GOV.UK to redirect back to after
       signing out (optional, default: `/`)
+
+  This calls `DELETE /api/session/:session_id` to delete the session.
 
 These endpoints are just part of redirection flows, they have no
 visible response.
@@ -292,7 +296,22 @@ The app will serve these endpoints:
   This is a partial update.  Attributes *not* named in the hash keep
   their previous values.
 
-- `POST /api/state`: sets some attribute values that will be persisted
+- `GET /api/oauth/sign-in`: returns a URL to redirect the user to, to
+  initiate the OAuth login/consent flow.  Accepts these parameters:
+
+    - `redirect_path`: (optional, default: `/`)
+    - `state_id`: (optional)
+
+- `POST /api/oauth/callback`: returns a session ID, if the user has
+  successfully authenticated.  Accepts these parameters:
+
+    - `code`: the `code` from the OAuth response
+    - `state`: the `state` from the OAuth response
+
+  The session ID is generated randomly.  If a user signs in multiple
+  times they will receive different session IDs.
+
+- `POST /api/oauth/state`: sets some attribute values that will be persisted
   if the user creates a new account, regardless of whether the user
   returns to GOV.UK.  Accepts these parameters:
 
@@ -300,6 +319,8 @@ The app will serve these endpoints:
 
     Returns an ID which can be passed to `/sign-in`.  The record
     expires after 1 hour.
+
+- `DELETE /api/session/:session_id`: terminates the given session.
 
 ### How the Transition Checker will work
 
@@ -328,7 +349,7 @@ endpoints moved to frontend and to account-api:
 1. The button sends the user to a new controller in finder-frontend,
    which:
 
-   - Calls `/api/state` with the user's answers, generating an ID
+   - Calls `/api/oauth/state` with the user's answers, generating an ID
    - Redirects the user to `/sign-in?state_id=...&redirect_path=...&_ga=...`
 
 2. The new app passes the state attributes to the accounts system
