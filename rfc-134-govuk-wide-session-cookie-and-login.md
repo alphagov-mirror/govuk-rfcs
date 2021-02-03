@@ -68,9 +68,9 @@ experience:
 
 1. The user logs in to use some personalised part of GOV.UK.
 
-2. The user then spends spends 30 minutes (or whatever we use for the
-   session duration) viewing non-personalised parts of GOV.UK, but
-   without leaving the site.
+2. The user then spends 30 minutes (or whatever we use for the session
+   duration) viewing non-personalised parts of GOV.UK, but without
+   leaving the site.
 
 3. The user then tries to use another personalised part of GOV.UK, but
    their session has expired, because the non-personalised parts
