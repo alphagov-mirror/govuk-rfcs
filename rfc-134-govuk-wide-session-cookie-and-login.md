@@ -196,13 +196,14 @@ if (resp.http.GOVUK-Account-End-Session) {
   unset resp.http.GOVUK-Account-End-Session;
 } else if (resp.http.GOVUK-Account-Session) {
   add resp.http.Set-Cookie = "__Host-govuk_account_session=" + resp.http.GOVUK-Account-Session + "; secure; httponly; samesite=strict; path=/"
-  unset resp.http.GOVUK-Account-Session;
 }
 
 if (resp.http.Vary ~ "GOVUK-Account-Session") {
   unset resp.http.Vary:GOVUK-Account-Session;
   set resp.http.Cache-Control:private = "";
 }
+
+unset resp.http.GOVUK-Account-Session;
 ```
 
 ### Extend frontend to manage the auth process
