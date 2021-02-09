@@ -278,10 +278,9 @@ The app will serve these endpoints:
     - `state_id`: (optional)
 
 - `POST /api/oauth/callback`: returns a session ID, if the user has
-  successfully authenticated.  Accepts these parameters:
-
-    - `code`: the `code` from the OAuth response
-    - `state`: the `state` from the OAuth response
+  successfully authenticated.  Accepts the parameters from the OAuth
+  response, which will depend on the flow we use.  For example, if we
+  use the `code` flow, the parameters will be `code` and `state`.
 
   The session ID is generated randomly.  If a user signs in multiple
   times they will receive different session IDs.
