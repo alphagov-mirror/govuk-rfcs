@@ -97,9 +97,14 @@ The Fastly docs have some [comments on the risks of cookies][fastly-cookies-risk
 ### Set a session cookie on www.gov.uk
 
 We'll set a new cookie, `__Host-govuk_account_session`, on www.gov.uk.
-This cookie will hold a unique session ID, randomly generated (in a
-collision-resistant way) when the user signs in, which is encrypted
-using asymmetric crypto.
+
+This cookie will hold:
+
+- The OAuth access token
+- The OAuth refresh token
+
+The access and refresh tokens are opaque and difficult-to-guess
+strings.
 
 This cookie is a secure, [domain-locked][], session cookie:
 
@@ -117,31 +122,34 @@ The cross-government single-sign-on part of this work is out of scope.
 
 [domain-locked]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies#Cookie_prefixes
 
-#### Cookie encryption
-
-The cookie value is encrypted with a private key.  This ensures that
-an attacker cannot tamper with the value.  Apps which consume the
-cookie can use the public key to validate it.  This key can be truly
-public, as the session ID itself is not sensitive.
-
-If the cookie value is malformed, for example if an attacker has tried
-re-encrypting it with a different private key, the consuming app
-should log the user out by expiring the cookie.
-
 #### Session duration
 
-We will have an internal API app (more on this later), keeping track
-of the mapping from session ID to user information, such as a user ID
-or OAuth tokens.
+The cookie is a session cookie.  We will not implement any server-side
+expiration mechanism, though if needed we can revoke or expire the
+refresh tokens.
 
-This session ID will expire after 1 hour of inactivity, at which point
-the user will need to log in again.  The expiration timeout is reset
-whenever the session is used to access some personalised content.
+#### ID tokens
 
-The average GOV.UK session length is 2.5 hours, but we know that this
-is distorted by a few users who leave pages open for very long times.
-We can revise the session ID timeout if we see evidence that 1 hour is
-too short.
+We will not store an OpenID Connect [ID token][] in the cookie.
+Instead the internal API app will make a UserInfo request to look up
+subject identifiers using the OAuth access token.
+
+[ID token]: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+
+#### Security considerations
+
+Access tokens have a short lifespan, and will only have access to:
+
+- Read from the OpenID Connect UserInfo endpoint, which returns data
+  about the current user.
+
+- Write to an internal API app (not exposed to the internet) which,
+  like our other API apps, will be authenticated with Signon bearer
+  tokens.
+
+Refresh tokens have a long lifespan, but using one requires the OAuth
+client credentials, which are only made available to the internal API
+app.
 
 ### Use custom HTTP headers to pass the cookie around
 
@@ -159,7 +167,7 @@ of our apps inappropriately.
 
 We will introduce two new headers:
 
-- `GOVUK-Account-Session`: holds the encrypted session ID.  Set by
+- `GOVUK-Account-Session`: holds the session cookie value.  Set by
   Fastly to pass the cookie to our apps, set by our apps to create a
   new cookie.
 
@@ -233,12 +241,10 @@ We will instead add the following endpoints to frontend:
   This calls `POST /api/oauth/callback` to create the session.
 
 - `GET /sign-out`: sets the `GOVUK-Account-End-Session` response
-  header and deletes the session state.  Accepts these parameters:
+  header.  Accepts these parameters:
 
     - `redirect_path`: path on GOV.UK to redirect back to after
       signing out (optional, default: `/`)
-
-  This calls `DELETE /api/session/:session_id` to delete the session.
 
 These endpoints are just part of redirection flows, they have no
 visible response.
@@ -254,22 +260,26 @@ The app will serve these endpoints:
 - `GET /api/attributes`: looks up and returns some attributes from the
   user's account.  Accepts these parameters:
 
-    - `session_id`: the decrypted session ID
+    - `session`: the `GOVUK-Account-Session` header value
     - `attributes`: list of attribute names
 
-    Returns a hash of attribute names and values, or a 401 if the
-    session has expired.
+  Returns either a 401 (if the access and refresh token have expired /
+  been revoked) or a hash of attribute names and values and a
+  `GOVUK-Account-Session` with a fresh access token, if the old one
+  expired.
 
 - `PATCH /api/attributes`: sets some attribute values on the user's
   account.  Accepts these parameters:
 
-    - `session_id`: the decrypted session ID
+    - `session`: the `GOVUK-Account-Session` header value
     - `attributes`: hash of attribute names and values
 
   This is a partial update.  Attributes *not* named in the hash keep
   their previous values.
 
-  Returns a 401 if the session has expired.
+  Returns either a 401 (if the access and refresh token have expired /
+  been revoked) or a new `GOVUK-Account-Session` with a fresh access
+  token, if the old one expired.
 
 - `GET /api/oauth/sign-in`: returns a URL to redirect the user to, to
   initiate the OAuth login/consent flow.  Accepts these parameters:
@@ -277,13 +287,10 @@ The app will serve these endpoints:
     - `redirect_path`: (optional, default: `/`)
     - `state_id`: (optional)
 
-- `POST /api/oauth/callback`: returns a session ID, if the user has
+- `POST /api/oauth/callback`: returns a session value, if the user has
   successfully authenticated.  Accepts the parameters from the OAuth
   response, which will depend on the flow we use.  For example, if we
   use the `code` flow, the parameters will be `code` and `state`.
-
-  The session ID is generated randomly.  If a user signs in multiple
-  times they will receive different session IDs.
 
 - `POST /api/oauth/state`: sets some attribute values that will be persisted
   if the user creates a new account, regardless of whether the user
@@ -293,8 +300,6 @@ The app will serve these endpoints:
 
     Returns an ID which can be passed to `/sign-in`.  The record
     expires after 1 hour.
-
-- `DELETE /api/session/:session_id`: terminates the given session.
 
 ### How the Transition Checker will work
 
@@ -311,8 +316,8 @@ endpoints moved to frontend and to account-api:
 
 4. The user is redirected to `www.gov.uk/sign-in/callback?...`
 
-5. A session ID is generated, and used to persist the OAuth access and
-   refresh tokens to the app's database
+5. The internal API app validates the OAuth response and returns the
+   value for the session header.
 
 6. The `GOVUK-Account-Session` response header is set
 
@@ -350,5 +355,5 @@ A Fastly-managed cookie won't work when running GOV.UK apps locally.
 
 To support that use-case, if `Rails.env.development?`, the new app
 will set an unencrypted `govuk_account_session` cookie, on the domain
-`dev.gov.uk`, which contains the session ID, in addition to sending
-the response headers.
+`dev.gov.uk`, which contains the session information, in addition to
+sending the response headers.
