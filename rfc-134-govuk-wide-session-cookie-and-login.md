@@ -341,8 +341,8 @@ welcomes the user, says we've sent them a confirmation email, and
 gives a link back to the service.  We want to persist the attributes
 even if the user does not click that link.
 
-We plan to remove the `state_id` things when we retire the Transition
-Checker experiment.
+We plan to remove the `state_id` mechanism when we retire the
+Transition Checker experiment.
 
 ### Local development
 
