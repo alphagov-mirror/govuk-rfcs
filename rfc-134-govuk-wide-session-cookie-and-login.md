@@ -255,7 +255,7 @@ We will create a new app—called account-api, which will live on a new
 machine class called personalisation—to manage sessions and to handle
 OAuth interactions with the GOV.UK Account system.
 
-The app will serve these endpoints:
+The app will serve these internal endpoints:
 
 - `GET /api/attributes`: looks up and returns some attributes from the
   user's account.  Accepts these parameters:
