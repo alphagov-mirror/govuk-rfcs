@@ -230,7 +230,7 @@ We will instead add the following endpoints to frontend:
       authenticating (optional, default: `/`)
     - `state_id`: see below (optional)
 
-  This calls `GET /api/oauth/sign-in` to get the URL to redirect the
+  This calls `GET /api/oauth2/sign-in` to get the URL to redirect the
   user to.
 
 - `GET /sign-in/callback`: where the accounts system sends the user
@@ -238,7 +238,7 @@ We will instead add the following endpoints to frontend:
   user successfully signed in.  Redirects the user back to the
   `redirect_path`.
 
-  This calls `POST /api/oauth/callback` to create the session.
+  This calls `POST /api/oauth2/callback` to create the session.
 
 - `GET /sign-out`: sets the `GOVUK-Account-End-Session` response
   header.  Accepts these parameters:
@@ -281,20 +281,21 @@ The app will serve these endpoints:
   been revoked) or a new `GOVUK-Account-Session` with a fresh access
   token, if the old one expired.
 
-- `GET /api/oauth/sign-in`: returns a URL to redirect the user to, to
+- `GET /api/oauth2/sign-in`: returns a URL to redirect the user to, to
   initiate the OAuth login/consent flow.  Accepts these parameters:
 
     - `redirect_path`: (optional, default: `/`)
     - `state_id`: (optional)
 
-- `POST /api/oauth/callback`: returns a session value, if the user has
-  successfully authenticated.  Accepts the parameters from the OAuth
-  response, which will depend on the flow we use.  For example, if we
-  use the `code` flow, the parameters will be `code` and `state`.
+- `POST /api/oauth2/callback`: returns a session value, if the user
+  has successfully authenticated.  Accepts the parameters from the
+  OAuth response, which will depend on the flow we use.  For example,
+  if we use the `code` flow, the parameters will be `code` and
+  `state`.
 
-- `POST /api/oauth/state`: sets some attribute values that will be persisted
-  if the user creates a new account, regardless of whether the user
-  returns to GOV.UK.  Accepts these parameters:
+- `POST /api/oauth2/state`: sets some attribute values that will be
+  persisted if the user creates a new account, regardless of whether
+  the user returns to GOV.UK.  Accepts these parameters:
 
     - `attributes`: hash of attribute names and values
 
@@ -328,7 +329,7 @@ endpoints moved to frontend and to account-api:
 1. The button sends the user to a new controller in finder-frontend,
    which:
 
-   - Calls `/api/oauth/state` with the user's answers, generating an ID
+   - Calls `/api/oauth2/state` with the user's answers, generating an ID
    - Redirects the user to `/sign-in?state_id=...&redirect_path=...&_ga=...`
 
 2. The new app passes the state attributes to the accounts system
